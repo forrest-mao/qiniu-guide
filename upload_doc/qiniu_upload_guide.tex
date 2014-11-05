@@ -1,0 +1,1099 @@
+\documentclass[11pt, oneside]{book}
+\usepackage{geometry}
+\geometry{a4paper}
+
+\usepackage{amsmath}
+\usepackage{xfrac}
+
+\usepackage{graphicx}
+\usepackage{indentfirst}
+\usepackage[colorlinks,urlcolor=blue]{hyperref}
+\usepackage{setspace}
+
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{array}
+
+\usepackage{listings}
+\lstset{basicstyle=\footnotesize}
+
+\usepackage{float}
+\usepackage[usenames,dvipsnames]{color}
+
+\usepackage{fontspec, xunicode, xltxtra}
+\setmainfont{Hiragino Sans GB W3}
+%\setmainfont{Microsoft YaHei}
+\XeTeXlinebreaklocale "zh"
+\XeTeXlinebreakskip = 0pt plus 1pt
+
+\newcommand{\qhint}[1]{
+\footnotesize
+\vspace{0.2em}
+\noindent
+#1\par
+\vspace{-0.5em}
+\normalsize
+}
+
+\newcommand{\qsym}[1]{
+\footnotesize
+\noindent
+#1\par
+\normalsize
+}
+
+\newcommand{\qpara}[1]{
+\vspace{0.2em}
+\begin{spacing}{1.35}
+\noindent
+#1\par
+\end{spacing}
+\vspace{0.2em}
+}
+
+\newcommand{\qblock}[1]{
+\vspace{0.1em}
+\noindent
+#1\par
+\vspace{0.1em}
+}
+
+\newcommand{\qsamplelink}[1]{
+\vspace{0.2em}
+\noindent
+#1\par
+\vspace{0.1em}
+}
+
+\newcommand{\qurl}[1]{\footnotesize\url{#1}\normalsize}
+\newcommand{\qqbox}[1]{\hspace{0.2em}\setlength{\fboxsep}{0.2em}\fcolorbox{black}{YellowGreen}{#1}\hspace{0.2em}}
+\newcommand{\qtable}[1]{\footnotesize\vspace{0.5em}#1\vspace{0.5em}\normalsize}
+\newcommand{\qsample}[1]{\hyperref[#1]{示例\ref*{#1}}}
+
+\newcommand{\qhttp}[1]{\noindent #1\par}
+
+\floatstyle{ruled}
+\newfloat{sample}{h}{sample}[chapter]
+\floatname{sample}{示例}
+
+\setlength{\textheight}{680pt}
+
+\title{七牛上传服务指南}
+\author{梁涛、茅力夫 \\ @七牛云存储}
+\date{2013-09-10}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+\chapter{上传业务模型}
+
+\qpara{七牛云存储提供多种上传业务模型，以满足不同业务场景的需求。用户可根据实际情况择优选用，使用\href{http://docs.qiniu.com/sdk/index.html}{官方SDK}/第三方SDK开发上传模块或工具。还可以直接使用\href{http://docs.qiniu.com/tools/v6/index.html}{官方工具}便捷快速地上传资源，无需额外编程。}
+
+\section{本地直传模型}
+
+\qpara{本模型适用于将存储在本地计算机或服务器的资源直接上传至七牛云，整个过程不涉及其它业务服务器。非常合适应用在大批量数据迁移、定期同步备份等场景下。}
+\qblock{■\thinspace 参与实体：七牛云、本地资源存储机。}
+\qblock{■\thinspace 官方实用工具：\href{http://docs.qiniu.com/tools/v6/qrsync.html}{qrsync}。}
+
+\begin{center}
+\includegraphics[scale=1]{../pics/upload/local_upload_direct.png}
+\end{center}
+
+\clearpage
+
+\section{客户端通知上传模型}
+
+\qpara{本模型适用于业务客户端将用户产生的内容（UGC）上传至七牛云后，将上传结果通知给业务服务器。合适附件存储、网盘、摄影摄像应用等场景。}
+\qblock{■\thinspace 参与实体：七牛云、业务客户端、业务服务器。}
+\qblock{■\thinspace 潜在问题：1）上传过程与通知过程是分离的，任一过程失败都将导致业务状态不一致；2）上传过程与通知过程都可能走低速线路，带来不必要的延迟。}
+
+\begin{center}
+\includegraphics[scale=1]{../pics/upload/ugc_upload_direct.png}
+\end{center}
+
+\clearpage
+
+\subsection{HTML表单上传模型}
+
+\qpara{本模型是客户端通知上传模型的一种特例，适用于业务客户端通过网页表单形式上传资源的场景（网站）。}
+\qblock{■\thinspace 参与实体：七牛云、业务客户端（浏览器）、业务服务器。}
+
+\begin{center}
+\includegraphics[scale=1]{../pics/upload/html_upload_direct.png}
+\end{center}
+
+\qpara{注意：\textcolor{red}{红线}为returnBody的传送轨迹。}
+
+\clearpage
+
+\section{七牛云通知上传模型}
+
+\qpara{本模型同样由业务客户端将用户产生的内容（UGC）上传至七牛云，但改由七牛云将上传结果通知给业务服务器，并将最终结果转送给业务客户端。}
+\qblock{■\thinspace 参与实体：七牛云、业务客户端、业务服务器。}
+\qblock{■\thinspace 优点：尽可能避免业务客户端/服务器之间多次交互带来的状态不一致问题，降低可能引发的业务风险。}
+
+\begin{center}
+\includegraphics[scale=1]{../pics/upload/ugc_upload_callback.png}
+\end{center}
+
+\qpara{注意：\textcolor{red}{红线}为callbackBody的传送轨迹。}
+
+\chapter{上传方式}
+
+\section{普通上传}
+
+\qpara{最简单、最直观的上传方式，通过将单一资源封装在一次HTTP请求中传输至七牛云。}
+\qblock{■\thinspace 优点：传输模型简单，API单一。}
+\qblock{■\thinspace 缺点：对大型资源不友好，失败概率与资源大小成正比，纠错成本高（只能重传整个资源）。}
+\qblock{■\thinspace 适用场景：大小固定的微型/小型资源上传、服务器之间资源传输。}
+
+\begin{center}
+\includegraphics[scale=1]{../pics/upload/one_put.png}
+\end{center}
+
+\section{断点续上传（Block）}
+
+\qpara{通过将资源切分为固定大小的数据块（称为Block，4MB大小），封装在多次HTTP请求中逐一传输至七牛云。}
+\qpara{可根据实际需求灵活地调整为串行传输或并发传输。}
+\qblock{■\thinspace 优点：对大型资源友好，纠错成本小（只重传失败的数据片，而不是数据块）。}
+\qblock{■\thinspace 缺点：传输模型复杂，API多。}
+\qblock{■\thinspace 适用场景：大小固定的中型/大型资源上传，弱信号通信线路的上传，频繁切换接入点/线路的上传。}
+
+\subsection{串行传输}
+
+\qpara{断点续上传的串行传输与单一资源的直传类似，只是传输单元更小、纠错成本更小。相对地，多次HTTP请求会带来传输成本的上升。}
+\qblock{■\thinspace 优点：逻辑简单，实现容易。}
+\qblock{■\thinspace 适用场景：需要快速编程实现业务逻辑的场景。}
+
+\begin{center}
+\includegraphics[scale=1]{../pics/upload/one_rput.png}
+\end{center}
+
+\qpara{虚线框：上传成功的数据范围。 \\ 实线框：可以读取的数据范围。}
+
+\subsection{并发传输}
+
+\qpara{断点续上传的并发传输与多资源的并发直传类似，用于加快单一大型资源的传输速度。}
+\qblock{■\thinspace 优点：提供最高的带宽利用率。}
+\qblock{■\thinspace 缺点：涉及多线程技术，增加了调试难度。}
+\qblock{■\thinspace 适用场景：需要调优以提高带宽利用率的场景。}
+
+\begin{center}
+\includegraphics[scale=1]{../pics/upload/one_rputl.png}
+\end{center}
+
+\subsection{细粒度传输（Chunk）}
+
+\qpara{断点续上传的细粒度传输构建在对数据块的进一步切分之上，也即将数据块（Block）切分为非固定大小的数据片（称为Chunk，小于4MB），更灵活地贴合传输环境的限制，甚至智能调整传输速率以提供更好的用户体验。}
+\qpara{每个数据片封装成一个HTTP请求，过小的数据片将带来额外的传输成本。另外数据片不能并发上传。}
+\qblock{■\thinspace 适用场景：频繁切换接入点的环境，如地铁等信号弱、频繁重新接入网络的封闭空间。}
+
+\begin{center}
+\includegraphics[scale=1]{../pics/upload/one_rput_chunk.png}
+\end{center}
+
+\section{追加上传（Append，研发中）}
+
+\qpara{类似于操作系统打开文件时使用的Append参数，七牛云也提供相应语义的追加上传方式，在已保存文件的尾部追加数据。}
+\qpara{本方式同样采用切分数据、逐一上传的思路，但与断点续上传不同的是a）只切分成非固定大小的数据片（Chunk），b）每个数据片上传后即可立刻读取 。}
+\qblock{■\thinspace 优点：资源大小无限制，支持流式传输，支持即写即读。}
+\qblock{■\thinspace 缺点：传输模型复杂，不支持并发上传。}
+\qblock{■\thinspace 适用场景：流式资源的上传，如监控音频/视频流、直播视频流存储，无长度限制的日志。}
+
+\begin{center}
+\includegraphics[scale=1]{../pics/upload/one_append.png}
+\end{center}
+
+\qpara{实线框：上传成功/可以读取的数据范围。}
+
+\section{特性一览表}
+
+\qtable{
+\def\arraystretch{2}
+\begin{tabular}{|l|p{10em}|p{10em}|p{10em}|}
+\hline
+特性 & 普通上传 & 断点续上传 & 追加上传 \\
+\hline
+API数量 & 1 & 3 & 3 \\
+\hline
+单次上传数据量 & 最大500MB & 最大4MB & 最大500MB \\
+\hline
+单个资源数据量 & 最大500MB & 无限制 & 无限制 \\
+\hline
+数据块并发上传 & ${\texttimes}$ & ${\surd}$ & ${\texttimes}$ \\
+\hline
+即传即读 & ${\texttimes}$ & ${\texttimes}$ & ${\surd}$ \\
+\hline
+\end{tabular}
+}
+
+\clearpage
+
+\chapter{上传授权凭证}
+
+\qpara{为防止恶意上传垃圾资源（消耗存储空间，引发额外计费），或篡改/损坏/伪造资源，每个上传请求都需要随附一份上传授权凭证（uploadToken），用于验证上传者与上传请求的合法性。同时，需要在该凭证内指定上传策略参数。}
+\qpara{上传授权凭证通常由业务服务器签发，避免签名用的密钥泄露。}
+
+\section{策略参数}
+
+\qblock{■\thinspace 参数格式：\href{http://zh.wikipedia.org/wiki/JSON}{JSON}。}
+\begin{lstlisting}
+{
+    "scope":               "<Bucket                   string>",
+    "deadline":             <UnixTimestamp            int64>,
+    "insertOnly":           <AllowFileUpdating        int>,
+
+    "saveKey":             "<SaveKey                  string>",
+
+    "endUser":             "<EndUserId                string>",
+
+    "returnUrl":           "<RedirectURL              string>",
+    "returnBody":          "<ResponseBodyForAppClient string>",
+
+    "callbackUrl":         "<RequestUrlForAppServer   string>",
+    "callbackHost":        "<RequestHostForAppServer  string>",
+    "callbackBody":        "<RequestBodyForAppServer  string>",
+
+    "persistentOps":       "<persistentOpsCmds        string>",
+    "persistentNotifyUrl": "<persistentNotifyUrl      string>",
+    "persistentPipeline":  "<persistentPipeline		  string>",
+
+    "fsizeLimit":           <FileSizeLimit            int64>,
+
+    "detectMime":           <AutoDetectMimeType       int>,
+
+    "mimeLimit":           "<MimeLimit                string>"
+}
+\end{lstlisting}
+
+\clearpage
+
+\qblock{■\thinspace 参数说明：}
+\begin{center}
+\qtable{
+\def\arraystretch{2}
+\setlength{\extrarowheight}{1.6pt}
+\begin{longtable}{|m{12em}<{\centering}|p{25em}|p{8em}|}
+\hline
+名称 & 说明 & 备注 \\
+\hline
+\endhead
+\multirow{3}{*}{scope} & 指定存储目标 & 必填 \\
+      & "<Bucket>"：目标资源空间，如资源存在则\textcolor{red}{失败} & \\
+      & "<Bucket>:<Key>"：目标资源标识，如资源存在则\textcolor{red}{覆盖} ，若希望上传指定key的文件，并且不允许修改，那么可以将下面的 insertOnly属性值设为 1& \\
+\hline
+deadline & 凭证失效期限，\href{http://en.wikipedia.org/wiki/Unix_time}{UNIX Epoch格式}（绝对时间），单位：秒 & 必填 \\
+\hline
+insertOnly & 如果设置为非0值，则无论scope设置为什么形式，仅能以\textcolor{red}{新增}模式上传文件&\\
+\hline
+saveKey & 自定义资源名，支持魔法变量及自定义变量。这个字段仅当用户上传的时候没有主动指定key的时候起作用 & \\
+\hline
+endUser & 唯一属主标识，用于特殊操作，如作为业务客户端标识，为图片或视频打水印 & \\
+\hline
+returnUrl & 指定上传成功后执行\href{http://en.wikipedia.org/wiki/HTTP_301}{HTTP 301转跳}的目标URL，多用于HTML表单上传场景。最终URL为<returnUrl>?<returnBody> \newline 在凭证中指定本参数会触发七牛云返回301响应 & 不可与callbackUrl共用 \\
+\hline
+returnBody & 指定上传成功后七牛云返回给业务客户端的上传结果。支持魔法变量与自定义变量 & 不可与callbackBody共用 \\
+\hline
+callbackUrl & 指定上传成功后执行\href{http://en.wikipedia.org/wiki/POST_(HTTP)}{HTTP POST请求}的目标URL，多用于向业务服务器推送上传结果。必须是公网上能正常返回HTTP 200响应的URL & 不可与returnUrl共用 \\
+\hline
+callbackBody & 指定上传成功后推送的上传结果，支持魔法变量与自定义变量 & 不可与returnBody共用 \\
+\hline
+persisitentOps & 资源上传成功后触发执行的预转持久化处理指令列表，多个指令以分号（{\bf ;}）分隔 & \\
+\hline
+persisitentNotifyUrl & 接收预转持久化结果通知的URL，必须是公网上可以正常进行\href{http://en.wikipedia.org/wiki/POST_(HTTP)}{POST请求}并能响应\textcolor{blue}{HTTP/1.1 200 OK}的有效URL & \\
+\hline
+persistentPipeline & 转码队列名，资源上传成功后，触发转码时指定独立的队列进行转码。\textcolor{red}{为空则表示使用公用队列，处理速度比较慢}。建议使用\href{https://portal.qiniu.com/mps/pipeline}{专用队列} & \\
+\hline
+fsizeLimit & 限定上传文件的大小，单位：字节（Byte）；超过限制的上传内容会被判为上传失败，返回413状态码 &  \\
+\hline
+\multirow{7}{*}{detectMime} & 开启MimeType侦测功能 & \\ 
+ 	& 设为非0值，则忽略上传端传递的文件MimeType信息，使用七牛服务器侦测内容后的判断结果 & \\ 
+	& 默认设为0值，如上传端指定了MimeType则直接使用该值，否则按如下顺序侦测MimeType值：& \\  
+	& 1. 检查文件扩展名；& \\ 
+	& 2. 检查Key扩展名；& \\ 
+	& 3. 侦测内容。& \\  
+	& 如不能侦测出正确的值，会默认使用 \textcolor{red}{application/octet-stream} &  \\
+\hline
+\multirow{4}{*}{mimeLimit} & 限定用户上传的文件类型，指定本字段值，七牛服务器会侦测文件内容以判断MimeType，再用判断值跟指定值进行匹配，匹配成功则允许上传，匹配失败返回403状态码。& \\ 
+	& 1. "image/*"表示只允许上传图片类型；& \\ 
+	& 2. "image/jpeg;image/png"表示只允许上传`jpg`和`png`类型的图片；& \\ 
+	& 3."!application/json;text/plain"表示禁止上传`json`文本和纯文本（注意最前面的感叹号）& \\
+\hline 
+\end{longtable}
+}
+\end{center}
+
+\begin{sample}
+  \caption{uploadToken实例（覆盖语义）}
+\begin{lstlisting}
+{
+    "scope":                "qiniu-ts-demo",
+    "deadline":             1390528576,
+    "persistentOps":        "avthumb/mp4;avthumb/m3u8/segtime/15/preset/video_440k",
+    "persistentNotifyUrl":  "http://fake.com/qiniu/notify"
+}
+\end{lstlisting}
+
+  \label{uploadToken-overwrite}
+\end{sample}
+
+\clearpage
+
+\section{签名算法}
+
+\begin{center}
+\includegraphics[scale=1]{../pics/upload/upload_token.png}
+\end{center}
+
+\href{http://zh.wikipedia.org/wiki/Base64#.E5.9C.A8URL.E4.B8.AD.E7.9A.84.E5.BA.94.E7.94.A8}{URL友好的Base64编码（urlsafe\_base64）}\par
+\href{http://en.wikipedia.org/wiki/SHA-1}{SHA1摘要算法}\par
+\href{http://en.wikipedia.org/wiki/Hash-based_message_authentication_code}{HMAC签名算法}\par
+
+\section{魔法变量（Magic Variables）}
+
+\qpara{魔法变量是七牛云与用户交换数据的一种占位符机制，在业务服务器生成的\qqbox{returnBody}或\qqbox{callbackBody}中占据某一位置形成模板，由七牛云在恰当时机求值并填入对应反馈信息。具体传递方法参看\hyperref[putf-direct-with-variabes]{示例}。}
+
+\qblock{■\thinspace 书写形式：类似变量引用与属性引用，区分大小写。}
+\begin{lstlisting}
+$(MagicVariable)
+$(MagicVariable.Field)
+$(MagicVariable.Field.SubField)
+...
+\end{lstlisting}
+
+\qblock{■\thinspace 通用变量一览：}
+\qtable{
+\def\arraystretch{2}
+\begin{tabular}{|p{15em}|p{25em}|}
+\hline
+名称 & 说明 \\
+\hline
+bucket & 上传目标资源空间的名字 \\
+\hline
+etag & 资源上传成功后的ETag。上传时不指定资源名，其值为缺省资源名（由七牛云自动推导） \\
+\hline
+fname & 原始文件名 \\
+\hline
+fsize & 资源大小，单位：字节（Byte） \\
+\hline
+mimeType & 资源类型，比如\qqbox{.jpg}图片的资源类型为\qqbox{image/jpg}。上传时不指定资源类型，其值为缺省资源类型（由七牛云自动推导） \\
+\hline
+endUser & \qqbox{uploadToken}中指定的\qqbox{endUser}值，即唯一属主标识 \\
+\hline
+persistentId & 
+\end{tabular}
+}
+
+\clearpage
+
+\qblock{■\thinspace 图片资源相关变量一览：}
+\qtable{
+\def\arraystretch{2}
+\begin{tabular}{|p{15em}|p{25em}|}
+\hline
+名称 & 说明 \\
+\hline
+imageInfo & 图片基本信息 \\
+\hline
+imageInfo.format & 图片格式 \\
+\hline
+imageInfo.width & 图片宽度，单位：像素（Pixel） \\
+\hline
+imageInfo.height & 图片高度，单位：像素（Pixel） \\
+\hline
+imageInfo.colorModel & 色彩模型 \\
+\hline
+exif & \href{http://zh.wikipedia.org/wiki/EXIF}{EXIF}信息 \newline 更多子项请参考\href{http://www.exif.org/Exif2-2.PDF}{EXIF白皮书} \\
+\hline
+exif.ApertureValue & 光圈值 \\
+\hline
+exif.ColorSpace & 色彩模型 \\
+\hline
+exif.DateTime & 拍摄时间 \\
+\hline
+exif.ExifVersion & EXIF版本 \\
+\hline
+exif.ExposureBiasValue & 曝光偏差值 \\
+\hline
+exif.ExposureMode & 曝光模式 \\
+\hline
+exif.ExposureTime & 曝光时间 \\
+\hline
+exif.FNumber & 光圈号 \\
+\hline
+exif.Flash & 闪光灯状态 \\
+\hline
+exif.FocalLength & 焦距 \\
+\hline
+exif.ISOSpeedRatings & ISO值 \\
+\hline
+exif.Model & 设备型号 \\
+\hline
+exif.WhiteBalance & 白平衡模式 \\
+\hline
+exif.XResolution & 横向分辨率 \\
+\hline
+exif.YResolution & 纵向分辨率 \\
+\hline
+\end{tabular}
+}
+
+\clearpage
+
+\section{自定义变量（X-Variables）}
+
+\qpara{自定义变量是七牛云提供的另一种占位符机制，用于协助业务客户端与业务服务器之间交换信息。业务服务器负责生成\qqbox{returnBody}或\qqbox{callbackBody}模板，由七牛云填入业务客户端传回的对应信息后返回给业务服务器。借由这一机制可以减少不必要的交互，降低失败风险，减少流量。}
+\qpara{自定义变量的名称由七牛用户自行定义，并以\qqbox{x:}打头（区分大小写），如\qqbox{x:location}和\qqbox{x:price}。具体传递方法参看\hyperref[putf-direct-with-variabes]{示例}。}
+
+\chapter{API}
+
+\qpara{七牛云的资源上传API基于\href{http://en.wikipedia.org/wiki/Hypertext\_Transfer\_Protocol}{HTTP协议}，通过\href{http://en.wikipedia.org/wiki/POST\_(HTTP)}{HTTP POST方法}实现。}
+\qpara{上传参数与数据采用\href{http://en.wikipedia.org/wiki/MIME\#Multipart\_messages}{multipart/form-data}格式组织，便于使用\href{http://www.w3.org/TR/html4/interact/forms.html}{HTML表单}直接上传文件的同时也适用于其它场景。}
+
+\section{直传}
+
+\subsection{直传单一资源（文件）}
+
+\qblock{■\thinspace 策略参数：}
+{
+\tt \footnotesize
+\qhttp{\{}
+\qhttp{    "scope":    "demoshow:test2.txt",}
+\qhttp{    "deadline": 1379918153}
+\qhttp{\}}
+\qhttp{\ }
+}
+
+\qblock{■\thinspace 请求：}
+{
+\tt \footnotesize
+\qhttp{POST / HTTP/1.1}
+\qhttp{Connection: close}
+\qhttp{Content-Length: 619}
+\qhttp{\textcolor{blue}{User-Agent: Easy-Qiniu-Perl-SDK/0.1}}
+\qhttp{\textcolor{blue}{Content-Type: multipart/form-data; boundary=763C032728D21BC3D50ED93F1965413BC37B25B4}}
+\qhttp{\textcolor{blue}{Host: up.qiniu.com}}
+\qhttp{\ }
+\qhttp{--763C032728D21BC3D50ED93F1965413BC37B25B4}
+\qhttp{Content-Disposition: form-data; name="\textcolor{red}{token}"}
+\qhttp{\ }
+\qhttp{\textcolor{red}{u8WqmQu1jH21kxpIQmo2LqntzugM1VoHE9\_pozCU:wj8BDLCrYgiKVfhUIxUO1iF3k0g=:eyJkZWFkbGl...}}
+\qhttp{--763C032728D21BC3D50ED93F1965413BC37B25B4}
+\qhttp{Content-Disposition: form-data; name="\textcolor{red}{key}"}
+\qhttp{\ }
+\qhttp{\textcolor{red}{test2.txt}}
+\qhttp{--763C032728D21BC3D50ED93F1965413BC37B25B4}
+\qhttp{Content-Disposition: form-data; name="\textcolor{red}{file}"; filename="test2.txt"}
+\qhttp{Content-Type: application/octet-stream}
+\qhttp{Content-Transfer-Encoding: binary}
+\qhttp{\ }
+\qhttp{\textcolor{YellowOrange}{This is a plain text file for testing.}}
+\qhttp{\textcolor{YellowOrange}{Again.}}
+\qhttp{\ }
+\qhttp{--763C032728D21BC3D50ED93F1965413BC37B25B4--}
+\qhttp{\ }
+}
+
+\qblock{■\thinspace 参数说明：}
+\qtable{
+\def\arraystretch{2}
+\begin{tabular}{|l|p{7em}|p{19em}|p{7em}|}
+\hline
+协议层次 & 名称 & 说明 & 备注 \\
+\hline
+HTTP & \textcolor{blue}{Content-Type} & 指定参数与数据组织格式 \newline 固定值：multipart/form-data & \\
+\hline
+HTTP & \textcolor{blue}{User-Agent} & 发起端身份标识，可用于防盗链、日志分析 & SDK可设定特殊标识符 \\
+\hline
+HTTP & \textcolor{blue}{Host} & 上传服务器主机域名 \newline 固定值：up.qiniu.com & \\
+\hline
+API & \textcolor{red}{token} & 上传授权凭证 & \\
+\hline
+API & \textcolor{red}{key} & 资源名 & \\
+\hline
+API & \textcolor{red}{file} & 文件内容 & \\
+\hline
+\end{tabular}
+}
+
+\qpara{\ }
+
+\qblock{■\thinspace 响应：}
+{
+\tt \footnotesize
+\qhttp{HTTP/1.1 200 OK}
+\qhttp{Date: Sun, 29 Sep 2013 05:09:05 GMT}
+\qhttp{Content-Type: application/json}
+\qhttp{Connection: close}
+\qhttp{Cache-Control: no-store, no-cache, must-revalidate}
+\qhttp{Content-Length: 57}
+\qhttp{Pragma: no-cache}
+\qhttp{X-Content-Type-Options: nosniff}
+\qhttp{\textcolor{blue}{X-Log: BDT;BDT;LBD:1;rs.put:15;rs-upload.putFile:59;UP:60}}
+\qhttp{\textcolor{blue}{X-Reqid: KT0AAMALhqX-RigT}}
+\qhttp{\ }
+\qhttp{\{"\textcolor{red}{hash}":"Fre2JqI866GUYQQUpfy6lvE792Ka","\textcolor{red}{key}":"test2.txt"\}}
+\qhttp{\ }
+}
+
+\qblock{■\thinspace 返回值说明：}
+\qtable{
+\def\arraystretch{2}
+\begin{tabular}{|l|p{7em}|p{19em}|p{7em}|}
+\hline
+协议层次 & 名称 & 说明 & 备注 \\
+\hline
+API & \textcolor{blue}{X-Log} & 七牛云用于跟踪错误的微型日志 \newline ★可作为查错线索提交给客服人员 & \\
+\hline
+API & \textcolor{blue}{X-Reqid} & 七牛云用于跟踪错误的流水号 \newline ★可作为查错线索提交给客服人员 & \\
+\hline
+API & \textcolor{red}{hash} & ETag值，用于追踪资源版本 & \\
+\hline
+API & \textcolor{red}{key} & 最终资源名 & \\
+\hline
+\end{tabular}
+}
+
+\clearpage
+
+\subsection{直传单一资源（图片＋魔法变量＋自定义变量）}
+\label{putf-direct-with-variabes}
+
+\qblock{■\thinspace 策略参数：}
+{
+\tt \footnotesize
+\qhttp{\{}
+\qhttp{    "scope":    "demoshow:gogopher.jpg",}
+\qhttp{    "deadline": 1379918153,}
+\qhttp{    "returnUrl": "\textcolor{YellowGreen}{http://fake.com/path/to/return}",}
+\qhttp{    "returnBody": "w=\textcolor{red}{\$(imageInfo.width)}\&h=\textcolor{red}{\$(imageInfo.height)}\&t=\textcolor{red}{\$(x:tag)}"}
+\qhttp{\}}
+\qhttp{\ }
+}
+
+\qblock{■\thinspace 请求：}
+{
+\tt \footnotesize
+\qhttp{POST / HTTP/1.1}
+\qhttp{Connection: close}
+\qhttp{Content-Length: 215348}
+\qhttp{User-Agent: Easy-Qiniu-Perl-SDK/0.1}
+\qhttp{Content-Type: multipart/form-data; boundary=59DD4152B8BEADAAA35AAAA0D8C5A90F75AAFEF8}
+\qhttp{Host: up.qiniu.com}
+\qhttp{\ }
+\qhttp{--59DD4152B8BEADAAA35AAAA0D8C5A90F75AAFEF8}
+\qhttp{Content-Disposition: form-data; name="token"}
+\qhttp{\ }
+\qhttp{u8WqmQu1jH21kxpIQmo2LqntzugM1VoHE9\_pozCU:UZM2jTH7J97jzIN7fVS2BJx\_bdQ=:eyJyZXR1cm5...}
+\qhttp{--59DD4152B8BEADAAA35AAAA0D8C5A90F75AAFEF8}
+\qhttp{Content-Disposition: form-data; name="key"}
+\qhttp{\ }
+\qhttp{gogopher.jpg}
+\qhttp{--59DD4152B8BEADAAA35AAAA0D8C5A90F75AAFEF8}
+\qhttp{Content-Disposition: form-data; name="\textcolor{red}{x:tag}"}
+\qhttp{\ }
+\qhttp{\textcolor{red}{gopher}}
+\qhttp{--59DD4152B8BEADAAA35AAAA0D8C5A90F75AAFEF8}
+\qhttp{Content-Disposition: form-data; name="file"; filename="gogopher.jpg"}
+\qhttp{Content-Type: application/octet-stream}
+\qhttp{Content-Transfer-Encoding: binary}
+\qhttp{\ }
+\qhttp{JFIFHHXICC\_PROFILEHLinomntrRGB XYZ  ...}
+\qhttp{\ }
+}
+
+\qblock{■\thinspace 响应：}
+{
+\tt \footnotesize
+\qhttp{HTTP/1.1 301 Moved Permanently}
+\qhttp{Date: Sun, 29 Sep 2013 09:00:20 GMT}
+\qhttp{Content-Type: text/plain; charset=utf-8}
+\qhttp{Connection: close}
+\qhttp{Cache-Control: no-store, no-cache, must-revalidate}
+\qhttp{Location: \textcolor{YellowGreen}{http://fake.com/path/to/return}?upload\_ret=\textcolor{LimeGreen}{dz02NDAmaD00MjcmdD0iZ29waGVyIg==}}
+\qhttp{Pragma: no-cache}
+\qhttp{X-Content-Type-Options: nosniff}
+\qhttp{X-Log: BDT:4;BDT:5;LBD:6;rs.put:14;rs-upload.putFile:22;UP:23/301}
+\qhttp{X-Reqid: KT0AAHjM7hidUygT}
+\qhttp{Content-Length: 0}
+\qhttp{\ }
+}
+
+\qblock{■\thinspace returnBody：}
+{
+\tt \footnotesize
+\qhttp{\textcolor{LimeGreen}{dz02NDAmaD00MjcmdD0iZ29waGVyIg==}}
+\qhttp{Base64 decode =>}
+\qhttp{w=\textcolor{red}{640}\&h=\textcolor{red}{427}\&t="\textcolor{red}{gopher}"}
+\qhttp{\ }
+}
+
+\section{断点续上传}
+
+\subsection{微型资源上传}
+
+\qpara{对于小于4MB的微型资源，只需要上传一个数据块并合成文件即可。}
+\qpara{由于一次完整的断点续上传至少涉及2次HTTP交互，共计4个HTTP报文，因此建议根据应用场景灵活决定某个大小以下的资源改用直传，减少交互次数。}
+\qpara{本例不涉及多个数据片上传。}
+
+\qblock{■\thinspace 策略参数：}
+{
+\tt \footnotesize
+\qhttp{\{}
+\qhttp{    "scope":    "demoshow:test2.txt",}
+\qhttp{    "deadline": 1379918153,}
+\qhttp{\}}
+\qhttp{\ }
+}
+
+\qblock{■\thinspace 请求样例1，创建数据块上传会话，传递首个数据块大小与其第一个数据片：}
+{
+\tt \footnotesize
+\qhttp{POST \textcolor{red}{/mkblk}\textcolor{LimeGreen}{/46} HTTP/1.1}
+\qhttp{Connection: close}
+\qhttp{\textcolor{blue}{Content-Length: 46}}
+\qhttp{User-Agent: Easy-Qiniu-Perl-SDK/0.1}
+\qhttp{\textcolor{blue}{Content-Type: application/octet-stream}}
+\qhttp{\textcolor{blue}{Host: up.qiniu.com}}
+\qhttp{\textcolor{blue}{Authorization: UpToken u8WqmQu1jH21kxpIQmo2LqntzugM1VoHE9\_pozCU:Hh2Fi\_7KmGEtiqXFF...}}
+\qhttp{\ }
+\qhttp{\textcolor{YellowOrange}{This is a plain text file for testing.}}
+\qhttp{\textcolor{YellowOrange}{Again.}}
+\qhttp{\ }
+}
+
+\qblock{●\thinspace 接口URL格式：}
+\begin{lstlisting}
+http://up.qiniu.com/mkblk/<blockSize>
+\end{lstlisting}
+
+\qblock{●\thinspace 参数说明：}
+\qtable{
+\def\arraystretch{2}
+\begin{tabular}{|l|p{9em}|p{17em}|p{7em}|}
+\hline
+协议层次 & 名称 & 说明 & 备注 \\
+\hline
+HTTP & \textcolor{blue}{Content-Length} & （第一个）数据片大小 & \\
+\hline
+HTTP & \textcolor{blue}{Content-Type} & 指定上传数据块的内容类型 \newline 固定值：application/octet-stream & \\
+\hline
+HTTP & \textcolor{blue}{Host} & 上传服务器主机域名 \newline 固定值：up.qiniu.com & \\
+\hline
+HTTP & \textcolor{blue}{Authorization} & 上传授权凭证 \newline 格式：UpToken <授权凭证> & \\
+\hline
+API & \textcolor{red}{/mkblk} & 上传指令：创建一个数据块上传会话 & \\
+\hline
+API & \textcolor{LimeGreen}{/46} & 上传数据块大小 & 最大4MB \\
+\hline
+API & \textcolor{YellowOrange}{This is a...} & 数据片内容 & \\
+\hline
+\end{tabular}
+}
+
+\clearpage
+
+\qblock{■\thinspace 响应样例1，收存第一个数据片，返回上传会话信息：}
+{
+\tt \footnotesize
+\qhttp{HTTP/1.1 200 OK}
+\qhttp{Server: nginx/1.0.8}
+\qhttp{Date: Tue, 08 Oct 2013 08:05:16 GMT}
+\qhttp{Content-Type: application/json}
+\qhttp{Connection: close}
+\qhttp{Cache-Control: no-store, no-cache, must-revalidate}
+\qhttp{Content-Length: 323}
+\qhttp{Pragma: no-cache}
+\qhttp{X-Content-Type-Options: nosniff}
+\qhttp{X-Log: BDT;BDT;LBD:1;UP:4}
+\qhttp{X-Reqid: KT0AAEC4BhvVEysT}
+\qhttp{\ }
+\qhttp{\{"\textcolor{red}{ctx}":"oOFl-Y7dIZ...","\textcolor{red}{checksum}":"t7YmojzroZ...","\textcolor{red}{crc32}":2035613763,}
+\qhttp{"\textcolor{red}{offset}":46,"\textcolor{red}{host}":"http://up-nb-5.qbox.me"\}}
+\qhttp{\ }
+}
+
+\qblock{●\thinspace 返回值说明：}
+\qtable{
+\def\arraystretch{2}
+\begin{tabular}{|l|p{7em}|p{19em}|p{7em}|}
+\hline
+协议层次 & 名称 & 说明 & 备注 \\
+\hline
+API & \textcolor{red}{ctx} & 已传部分的上传上下文信息 & 仅供服务器使用 \\
+\hline
+API & \textcolor{red}{checksum} & 已传部分的校验信息 & 仅供服务器使用 \\
+\hline
+API & \textcolor{red}{crc32} & 已传部分的CRC32校验值 \newline 可与本地计算的CRC32值对比 & \\
+\hline
+API & \textcolor{red}{offset} & 已传部分的偏移值，单位：Byte（字节） & \\
+\hline
+API & \textcolor{red}{host} & 下一请求报文使用的主机域名 & \\
+\hline
+\end{tabular}
+}
+
+\clearpage
+
+\qblock{■\thinspace 请求样例2，合成资源，传递资源大小、资源名和上传上下文信息：}
+{
+\tt \footnotesize
+\qhttp{POST \textcolor{red}{/mkfile}\textcolor{YellowGreen}{/46}\textcolor{red}{/key/dGVzdDIudHh0} HTTP/1.1}
+\qhttp{Connection: close}
+\qhttp{Content-Length: 208}
+\qhttp{User-Agent: Easy-Qiniu-Perl-SDK/0.1}
+\qhttp{\textcolor{blue}{Content-Type: text/plain}}
+\qhttp{\textcolor{blue}{Host: up-nb-5.qbox.me}}
+\qhttp{\textcolor{blue}{Authorization: UpToken u8WqmQu1jH21kxpIQmo2LqntzugM1VoHE9\_pozCU:Hh2Fi\_7KmGEtiqXFF...}}
+\qhttp{\ }
+\qhttp{\textcolor{YellowOrange}{oOFl-Y7dIZH6cPkXfuPWYP9jZCZxpf0NALRhFDlUpuQAASNFZ4mrze\_-3LqYdlQyEPDh0sNUaGlzIGlzI...}}
+\qhttp{\ }
+}
+
+\qblock{●\thinspace 接口URL格式：}
+\begin{lstlisting}
+http://<selectedUpHost>/mkfile/<blockSize>
+                       /key/<urlSafeBase64EncodedKey>
+                       /x:userVariable1/<urlSafeBase64EncodedVariable1>
+                       /x:userVariable2/<urlSafeBase64EncodedVariable2>
+                       ...
+                       /x:userVariableN/<urlSafeBase64EncodedVariableN>
+\end{lstlisting}
+
+\qblock{●\thinspace 参数说明：}
+\qtable{
+\def\arraystretch{2}
+\begin{tabular}{|l|p{7em}|p{19em}|p{7em}|}
+\hline
+协议层次 & 名称 & 说明 & 备注 \\
+\hline
+HTTP & \textcolor{blue}{Content-Type} & 指定上传上下文的内容类型 \newline 固定值：text/plain & \\
+\hline
+HTTP & \textcolor{blue}{Host} & 上传服务器主机域名 \newline 可变值：mkblk响应报文中的host字段值 & \\
+\hline
+HTTP & \textcolor{blue}{Authorization} & 上传授权凭证 \newline 格式：UpToken <授权凭证> & 即mkblk请求报告中的授权凭证 \\
+\hline
+API & \textcolor{red}{/mkfile} & 上传指令：根据传递的上传上下文序列，合成资源并指定资源名 & \\
+\hline
+API & \textcolor{YellowGreen}{/46} & 资源大小 & \\
+\hline
+API & \textcolor{red}{/key/dGVzdDIudHh0} & 指定资源名 & 需要编码为URL友好的Base64格式 \\
+\hline
+API & \textcolor{YellowOrange}{oOFl-Y7dIZ...} & 各个数据块的上传上下文列表，以逗号（,）分隔 \newline 按数据块在资源中的位置排序 & \\
+\hline
+\end{tabular}
+}
+
+\clearpage 
+
+\qblock{■\thinspace 响应样例2，合成资源：}
+{
+\tt \footnotesize
+\qhttp{HTTP/1.1 200 OK}
+\qhttp{Server: nginx/1.0.8}
+\qhttp{Date: Tue, 08 Oct 2013 08:05:16 GMT}
+\qhttp{Content-Type: application/json}
+\qhttp{Connection: close}
+\qhttp{Cache-Control: no-store, no-cache, must-revalidate}
+\qhttp{Content-Length: 57}
+\qhttp{Pragma: no-cache}
+\qhttp{X-Content-Type-Options: nosniff}
+\qhttp{X-Log: rs.put:7;mkfilev2.onFilePutted:7;UP:7}
+\qhttp{X-Reqid: KT0AANDC-iLVEysT}
+\qhttp{\ }
+\qhttp{\{"\textcolor{red}{hash}":"Fre2JqI866GUYQQUpfy6lvE792Ka","\textcolor{red}{key}":"test2.txt"\}}
+\qhttp{\ }
+}
+
+\qblock{●\thinspace 返回值说明：}
+\qtable{
+\def\arraystretch{2}
+\begin{tabular}{|l|p{7em}|p{19em}|p{7em}|}
+\hline
+协议层次 & 名称 & 说明 & 备注 \\
+\hline
+API & \textcolor{red}{hash} & ETag值，用于追踪资源版本 & \\
+\hline
+API & \textcolor{red}{key} & 最终资源名 & \\
+\hline
+\end{tabular}
+}
+
+\clearpage
+
+\subsection{大型资源上传（6MB）}
+
+\qpara{对于超过4MB的资源，断点续上传要求按4MB为单位将资源分割成数据块（Block），并进一步切分成数据片（Chunk）上传。}
+\qpara{数据块可以并发上传，而同一个数据块的数据片只能串行上传。}
+\qpara{数据片的大小可根据实际情况动态调整。}
+\qpara{本例涉及到两个数据块串行上传。}
+
+\qblock{■\thinspace 策略参数：}
+{
+\tt \footnotesize
+\qhttp{\{}
+\qhttp{    "scope":    "demoshow:zeros",}
+\qhttp{    "deadline": 1379918153,}
+\qhttp{\}}
+\qhttp{\ }
+}
+
+\qblock{■\thinspace 请求样例1，创建1号数据块上传会话，传递首个数据块大小与其第一个数据片：}
+{
+\tt \footnotesize
+\qhttp{POST /mkblk/\textcolor{LimeGreen}{4194304} HTTP/1.1}
+\qhttp{Connection: close}
+\qhttp{\textcolor{blue}{Content-Length: 262144}}
+\qhttp{User-Agent: Easy-Qiniu-Perl-SDK/0.1}
+\qhttp{Content-Type: application/octet-stream}
+\qhttp{Host: up.qiniu.com}
+\qhttp{Authorization: UpToken u8WqmQu1jH21kxpIQmo2LqntzugM1VoHE9\_pozCU:iUhDkt1IhUazVkJLP7...}
+\qhttp{\ }
+\qhttp{...}
+\qhttp{\ }
+}
+
+\qblock{●\thinspace 参数说明：}
+\qtable{
+\def\arraystretch{2}
+\begin{tabular}{|l|p{9em}|p{17em}|p{7em}|}
+\hline
+协议层次 & 名称 & 说明 & 备注 \\
+\hline
+HTTP & \textcolor{blue}{Content-Length} & 上传数据片大小 & \\
+\hline
+API & \textcolor{LimeGreen}{/4194304} & 上传数据块大小 & 最大4MB \\
+\hline
+\end{tabular}
+}
+
+\qpara{\ }
+
+\qblock{■\thinspace 响应样例1，收存第一个数据片，返回1号上传会话信息：}
+{
+\tt \footnotesize
+\qhttp{HTTP/1.1 200 OK}
+\qhttp{Server: nginx/1.0.8}
+\qhttp{Date: Fri, 11 Oct 2013 07:25:53 GMT}
+\qhttp{Content-Type: application/json}
+\qhttp{Connection: close}
+\qhttp{Cache-Control: no-store, no-cache, must-revalidate}
+\qhttp{Content-Length: 327}
+\qhttp{Pragma: no-cache}
+\qhttp{X-Content-Type-Options: nosniff}
+\qhttp{X-Log: UP:4}
+\qhttp{X-Reqid: IxwAAPh6wJFs\_SsT}
+\qhttp{\ }
+\qhttp{\{"ctx":"uIBWEEiv8J...","checksum":"LgAPp-hXWc...","crc32":3792628258,}
+\qhttp{"offset":262144,"host":"http://up-nb-5.qbox.me"\}}
+\qhttp{\ }
+}
+
+\qblock{■\thinspace 请求样例2，传递1号上传上下文、已传大小与第N个数据片：}
+{
+\tt \footnotesize
+\qhttp{POST \textcolor{red}{/bput}\textcolor{SkyBlue}{/uIBWEEiv8J...}\textcolor{LimeGreen}{/262144} HTTP/1.1}
+\qhttp{Connection: close}
+\qhttp{Content-Length: 262144}
+\qhttp{User-Agent: Easy-Qiniu-Perl-SDK/0.1}
+\qhttp{Content-Type: application/octet-stream}
+\qhttp{\textcolor{blue}{Host: up-nb-5.qbox.me}}
+\qhttp{Authorization: UpToken u8WqmQu1jH21kxpIQmo2LqntzugM1VoHE9\_pozCU:iUhDkt1IhUazVkJLP7...}
+\qhttp{\ }
+\qhttp{...}
+\qhttp{\ }
+}
+
+\qblock{●\thinspace 参数说明：}
+\qtable{
+\def\arraystretch{2}
+\begin{tabular}{|l|p{9em}|p{17em}|p{7em}|}
+\hline
+协议层次 & 名称 & 说明 & 备注 \\
+\hline
+HTTP & \textcolor{blue}{Host} & 服务器返回的下一上传服务器主机域名 \newline 保证会话维持在相同服务器上 & \\
+\hline
+API & \textcolor{red}{/bput} & 上传指令：上传数据片 & 最大4MB \\
+\hline
+API & \textcolor{SkyBlue}{/uIBWEEiv8J..} & 已传部分的上传上下文 & \\
+\hline
+API & \textcolor{LimeGreen}{/262144} & 上传偏移位置 & \\
+\hline
+\end{tabular}
+}
+
+\qpara{\ }
+
+\qblock{■\thinspace 响应样例2，收存第N个数据片，返回1号上传会话信息：}
+{
+\tt \footnotesize
+\qhttp{HTTP/1.1 200 OK}
+\qhttp{Server: nginx/1.0.8}
+\qhttp{Date: Fri, 11 Oct 2013 07:25:53 GMT}
+\qhttp{Content-Type: application/json}
+\qhttp{Connection: close}
+\qhttp{Cache-Control: no-store, no-cache, must-revalidate}
+\qhttp{Content-Length: 327}
+\qhttp{Pragma: no-cache}
+\qhttp{X-Content-Type-Options: nosniff}
+\qhttp{X-Log: UP:7}
+\qhttp{X-Reqid: IxwAAEgEC6ps\_SsT}
+\qhttp{\ }
+\qhttp{\{"\textcolor{red}{ctx}":"JpQn4L-Kz3...","checksum":"alIeHSpjLC...","crc32":3792628258,}
+\qhttp{"offset":524288,"host":"http://up-nb-5.qbox.me"\}}
+\qhttp{\ }
+}
+
+\qblock{●\thinspace 返回值说明：}
+\qtable{
+\def\arraystretch{2}
+\begin{tabular}{|l|p{9em}|p{17em}|p{7em}|}
+\hline
+协议层次 & 名称 & 说明 & 备注 \\
+\hline
+API & \textcolor{red}{ctx} & 已传部分的上传上下文，随着成功上传内容的增多而变化 & \\
+\hline
+\end{tabular}
+}
+
+\qpara{\ }
+
+\qblock{■\thinspace 请求样例3，创建2号数据块上传会话，传递第二个数据块大小与其第一个数据片：}
+{
+\tt \footnotesize
+\qhttp{POST /mkblk\textcolor{LimeGreen}{/2097152} HTTP/1.1}
+\qhttp{Connection: close}
+\qhttp{\textcolor{blue}{Content-Length: 262144}}
+\qhttp{User-Agent: Easy-Qiniu-Perl-SDK/0.1}
+\qhttp{Content-Type: application/octet-stream}
+\qhttp{\textcolor{blue}{Host: up-nb-5.qbox.me}}
+\qhttp{Authorization: UpToken u8WqmQu1jH21kxpIQmo2LqntzugM1VoHE9\_pozCU:iUhDkt1IhUazVkJLP7...}
+\qhttp{\ }
+\qhttp{...}
+\qhttp{\ }
+}
+
+\qblock{●\thinspace 参数说明：}
+\qtable{
+\def\arraystretch{2}
+\begin{tabular}{|l|p{9em}|p{17em}|p{7em}|}
+\hline
+协议层次 & 名称 & 说明 & 备注 \\
+\hline
+HTTP & \textcolor{blue}{Content-Length} & 上传数据片大小 & \\
+\hline
+HTTP & \textcolor{blue}{Host} & 服务器返回的下一上传服务器主机域名 \newline 保证所有数据块会话维持在相同服务器上 & \\
+\hline
+API & \textcolor{LimeGreen}{/262144} & 上传数据块大小 & \\
+\hline
+\end{tabular}
+}
+
+\qpara{\ }
+
+\qblock{■\thinspace 响应样例3，收存第1个数据片，返回2号上传会话信息：}
+{
+\tt \footnotesize
+\qhttp{HTTP/1.1 200 OK}
+\qhttp{Server: nginx/1.0.8}
+\qhttp{Date: Fri, 11 Oct 2013 07:26:06 GMT}
+\qhttp{Content-Type: application/json}
+\qhttp{Connection: close}
+\qhttp{Cache-Control: no-store, no-cache, must-revalidate}
+\qhttp{Content-Length: 327}
+\qhttp{Pragma: no-cache}
+\qhttp{X-Content-Type-Options: nosniff}
+\qhttp{X-Log: UP:7}
+\qhttp{X-Reqid: IxwAANjV1ohv\_SsT}
+\qhttp{\ }
+\qhttp{\{"ctx":"cXa9tl8idv...","checksum":"LgAPp-hXWc...","crc32":3792628258,}
+\qhttp{"offset":262144,"host":"http://up-nb-5.qbox.me"\}}
+\qhttp{\ }
+}
+
+\qblock{■\thinspace 请求样例4，合成资源，传递资源大小、资源名和上传上下文信息列表：}
+{
+\tt \footnotesize
+\qhttp{POST \textcolor{red}{/mkfile}\textcolor{YellowGreen}{/6291456}\textcolor{SkyBlue}{/key/emVyb3M=} HTTP/1.1}
+\qhttp{Connection: close}
+\qhttp{Content-Length: 417}
+\qhttp{User-Agent: Easy-Qiniu-Perl-SDK/0.1}
+\qhttp{Content-Type: text/plain}
+\qhttp{Host: up-nb-5.qbox.me}
+\qhttp{Authorization: UpToken u8WqmQu1jH21kxpIQmo2LqntzugM1VoHE9\_pozCU:iUhDkt1IhUazVkJLP7...}
+\qhttp{\ }
+\qhttp{TonL6i-rCDeO2rRnbqZmYXnGiJNc1QxEUrPuZU-gEpcAmGfdaoqgkYoSr7qnyLQMFHu428MAAAAAAAAAAAAAAA}
+\qhttp{AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAA}
+\qhttp{lAkAAPfWV1IAAEAAAABAAAMAAAAVAP\_\_\_\_8=\textcolor{red}{,}pqqAr1UMKPQQlCBHnt0oGNE9oPVhy1uEXUsaMiHI\_Y4ADlVfP}
+\qhttp{YZPpHluvFxJnab8i8wECL8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}
+\qhttp{AAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAlAkAABHXV1IAACAAAAAgAAMAAAAVAP\_\_\_\_8=}
+\qhttp{\ }
+}
+
+\qblock{■\thinspace 响应样例4，合成资源：}
+{
+\tt \footnotesize
+\qhttp{HTTP/1.1 200 OK}
+\qhttp{Server: nginx/1.0.8}
+\qhttp{Date: Fri, 11 Oct 2013 07:26:10 GMT}
+\qhttp{Content-Type: application/json}
+\qhttp{Connection: close}
+\qhttp{Cache-Control: no-store, no-cache, must-revalidate}
+\qhttp{Content-Length: 53}
+\qhttp{Pragma: no-cache}
+\qhttp{X-Content-Type-Options: nosniff}
+\qhttp{X-Log: rs.put:11;mkfilev2.onFilePutted:12;UP:17}
+\qhttp{X-Reqid: IxwAADCc4YZw\_SsT}
+\qhttp{\ }
+\qhttp{\{"hash":"lvxwSaB2VXJaY8dXRiat4RlrTPTZ","key":"zeros"\}}
+\qhttp{\ }
+}
+
+\clearpage
+
+\section{追加上传}
+
+\qpara{待续……}
+
+\chapter{FAQ}
+
+\begin{itemize}
+  \item 资源名可以是中文吗？\par
+  \qhint{资源名可以是中文，上传前需要转换成UTF-8编码。}
+
+  \item 为什么上传授权凭证会经常失效？\par
+  \qhint{上传授权凭证使用的过期时间是绝对时间，需要将本地机器的时间校正为标准UTC时间（并设置为东八区）。}
+\end{itemize}
+
+\chapter{术语}
+
+\begin{itemize}
+\item {\bf 资源}\par
+\qhint{存入七牛云的数据体的统称，在有限前提下可与“文件”互换。}
+
+\item {\bf 七牛云}\par
+\qhint{所有对外放开的七牛服务及相关系统的统称，含云存储、云处理和云加速三大子系统。}
+\qhint{本文通篇使用“七牛云”指代“七牛云存储子系统”这一实体。}
+
+\item {\bf 业务服务器}\par
+\qhint{七牛用户自建的、用于运行业务逻辑的服务器实体。}
+
+\item {\bf 业务客户端}\par
+\qhint{七牛用户的用户（即最终用户）、用于运行交互逻辑的客户端实体。}
+
+\item {\bf 高速线路}\par
+\qhint{机房（或IDC）之间使用的通信线路，具有低延迟（20～50毫秒）、极低丢包率、中间路由少或转发效率高、上下行带宽对等等特点。}
+\qhint{注意：高速通信线路可能跨越不同运营商的异构网络。}
+
+\item {\bf 低速线路}\par
+\qhint{机房（或IDC）与业务客户端之间使用的通信线路，具有中等延迟（50～100毫秒）、低丢包率、偶发故障、偶发线路切换、上下行带宽不对等等特点。}
+
+\item {\bf 客户端接入环境}\par
+\qhint{业务客户端接入互联网的环境，常见的有LAN（局域网）、WLAN/Wi-Fi（无线局域网）、2G/3G（移动网）等。}
+\qhint{注意：接入环境会随着客户端物理位置随时发生改变，如离开房屋导致从Wi-Fi环境切换到3G环境，跨越3G信号塔覆盖区域导致在不同的接入基站之间切换。}
+\end{itemize}
+
+
+\end{document}
